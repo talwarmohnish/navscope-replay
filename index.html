@@ -106,7 +106,10 @@ select { padding:6px 7px; border:1px solid var(--border); border-radius:5px; bac
 .scenario { padding:15px; min-width:0; }
 .scenario-head { display:flex; justify-content:space-between; align-items:flex-start; gap:7px; margin-bottom:10px; }
 .scenario p,.holdings p,.aum p { color:var(--muted); font-size:.8rem; line-height:1.46; margin-top:3px; }
-.replay-chart { height:111px; overflow:hidden; background:var(--raised); border:1px solid var(--soft); border-radius:5px; }
+.chart-tools { display:flex; align-items:center; gap:7px; margin-bottom:6px; color:var(--muted); font-size:.76rem; }
+.chart-tools select { min-width:0; max-width:64%; }
+#chart-price { margin-left:auto; color:var(--text); font-weight:700; white-space:nowrap; }
+.replay-chart { height:120px; overflow:hidden; background:var(--raised); border:1px solid var(--soft); border-radius:5px; }
 .replay-chart canvas { display:block; width:100%; height:100%; }
 .replay-buttons { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin:8px 0 11px; }
 .replay-buttons .button { min-height:32px; }
@@ -129,7 +132,7 @@ input[type=range] { width:100%; margin:7px 0 4px; accent-color:var(--accent); cu
 .holdings-head,.aum-head { padding:13px 15px 11px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .sort { display:flex; align-items:center; gap:7px; font-size:.76rem; color:var(--muted); white-space:nowrap; }
 .table-scroll { overflow-x:auto; }
-table { width:100%; min-width:465px; border-collapse:collapse; text-align:left; }
+table { width:100%; min-width:550px; border-collapse:collapse; text-align:left; }
 th,td { padding:8px 14px; border-top:1px solid var(--soft); }
 th { background:var(--raised); color:var(--muted); font-size:.72rem; font-weight:700; }
 td { font-size:.8rem; }
@@ -248,8 +251,9 @@ dialog .import-error { color:var(--loss); }
       <section class="scenario card" id="replay" aria-labelledby="scenario-title">
         <div class="scenario-head"><div><h2 id="scenario-title">Market replay</h2><p id="market-description">Synthetic prices across an illustrative session.</p></div><output id="replay-time" class="replay-time">Manual scenario</output></div>
         <div id="scenario-controls">
-          <div class="replay-chart" id="replay-chart" aria-hidden="true"><canvas id="replay-plot"></canvas></div>
-          <div class="replay-buttons"><button type="button" class="button button-primary" id="play-replay">Play replay</button><button type="button" class="button button-plain" id="step-replay">Next tick</button><button type="button" class="text-action" id="reset-replay">Reset</button></div>
+          <div class="chart-tools"><label for="chart-series">Chart</label><select id="chart-series"><option value="nav">Estimated NAV</option></select><span id="chart-price"></span></div>
+          <div class="replay-chart" id="replay-chart"><canvas id="replay-plot" role="img" aria-label="Selected price in rupees over the simulated session from 09:15 to 15:30 IST. Use the replay controls to read prices at individual times."></canvas></div>
+          <div class="replay-buttons"><button type="button" class="button button-primary" id="play-replay">Play replay</button><button type="button" class="button button-plain" id="step-replay">Go to 09:15</button><button type="button" class="text-action" id="reset-replay">Reset</button></div>
           <div class="scenario-input"><label for="shock">Simulated move</label><output id="shock-value" for="shock">−0.10%</output></div>
           <input id="shock" type="range" min="-5" max="5" step="0.05" value="-0.1">
           <div class="range-labels" aria-hidden="true"><span>−5%</span><span>0%</span><span>+5%</span></div>
@@ -265,7 +269,7 @@ dialog .import-error { color:var(--loss); }
         <div><h2 id="holdings-title">Stock contributions</h2><p>How each holding affects the estimated NAV move.</p></div>
         <label class="sort"><span>Sort by</span><select id="holdings-sort"><option value="impact">Largest impact</option><option value="weight">Portfolio weight</option><option value="gain">Biggest lift</option><option value="loss">Biggest drag</option></select></label>
       </div>
-      <div class="table-scroll"><table><thead><tr><th scope="col">Holding</th><th scope="col">Weight</th><th scope="col">Price move</th><th scope="col">NAV impact</th></tr></thead><tbody id="holding-rows"><tr><td colspan="4">Loading holdings…</td></tr></tbody></table></div>
+      <div class="table-scroll"><table><thead><tr><th scope="col">Holding</th><th scope="col">Weight</th><th scope="col">Price (₹)</th><th scope="col">Price move</th><th scope="col">NAV impact</th></tr></thead><tbody id="holding-rows"><tr><td colspan="5">Loading holdings…</td></tr></tbody></table></div>
       <button id="show-holdings" class="table-more" type="button" hidden>Show all holdings</button>
     </section>
 
@@ -525,7 +529,7 @@ function parseMarketCsv(text) {
 const id = (key) => document.getElementById(key);
 const currency = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const currencyChange = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", signDisplay: "exceptZero" });
-const croresFormat = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rupees = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 const percent = new Intl.NumberFormat("en-IN", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signed = new Intl.NumberFormat("en-IN", { style: "percent", signDisplay: "exceptZero", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateFormat = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", year: "numeric", month: "short", day: "numeric" });
@@ -538,13 +542,25 @@ const pageSize = 6;
 const csvHeader = "isin,symbol,price,previous_close,base_date,as_of";
 const offlineSnapshot = document.getElementById("offline-data");
 const offlineData = offlineSnapshot ? JSON.parse(offlineSnapshot.textContent) : null;
-const replayTicks = [
-  { time: "09:15", move: -0.05 }, { time: "10:00", move: 0.05 },
-  { time: "10:45", move: -0.05 }, { time: "11:30", move: -0.15 },
-  { time: "12:15", move: -0.10 }, { time: "13:00", move: -0.25 },
-  { time: "13:45", move: -0.40 }, { time: "14:30", move: -0.35 },
-  { time: "15:00", move: -0.45 }, { time: "15:30", move: -0.30 },
+const replayAnchors = [
+  { minute: 555, move: -0.25 }, { minute: 600, move: 0.20 },
+  { minute: 645, move: -0.35 }, { minute: 690, move: -0.65 },
+  { minute: 735, move: -0.40 }, { minute: 780, move: -1.15 },
+  { minute: 825, move: -1.75 }, { minute: 870, move: -1.30 },
+  { minute: 900, move: -1.50 }, { minute: 930, move: -0.95 },
 ];
+const replayStepMinutes = 5;
+const replayTicks = [];
+for (const [index, anchor] of replayAnchors.entries()) {
+  const next = replayAnchors[index + 1];
+  const end = next?.minute ?? anchor.minute + replayStepMinutes;
+  for (let minute = anchor.minute; minute < end; minute += replayStepMinutes) {
+    const [hour, remainder] = [Math.floor(minute / 60), minute % 60].map((value) => String(value).padStart(2, "0"));
+    const move = next ? anchor.move + (next.move - anchor.move) * (minute - anchor.minute) / (end - anchor.minute) : anchor.move;
+    replayTicks.push({ time: `${hour}:${remainder}`, move });
+  }
+}
+const replayModels = new WeakMap();
 
 let data;
 let model;
@@ -554,6 +570,7 @@ let sourceRefresh;
 let loadNumber = 0;
 let replayFrame = -1;
 let replayTimer;
+let chartData;
 
 function preferredTheme() {
   try {
@@ -581,6 +598,20 @@ id("theme-dark").addEventListener("click", () => applyTheme("dark", true));
 
 function holdings() {
   return data.portfolio.holdings.map((position) => ({ ...position, weight: position.weightPct / 100 }));
+}
+
+function simulate(positions, { move, time }) {
+  const market = createDemoSnapshot({ holdings: positions, baseDate: data.nav.date, movePct: move / 100, time });
+  return estimateNav({ nav: data.nav, holdings: positions, market });
+}
+
+function replaySession() {
+  if (!data || data.portfolio.asOf > data.nav.date) return [];
+  if (!replayModels.has(data)) {
+    const positions = holdings();
+    replayModels.set(data, replayTicks.map((tick) => simulate(positions, tick)));
+  }
+  return replayModels.get(data);
 }
 
 function makeCell(row, text, className = "") {
@@ -612,6 +643,7 @@ function renderHoldings() {
     code.textContent = position.symbol || position.isin;
     holding.append(code);
     makeCell(row, percent.format(position.weight));
+    makeCell(row, position.price == null ? "—" : rupees.format(position.price));
     makeCell(row, signedLabel(position.returnPct), direction(position.returnPct));
     const impactCell = row.insertCell();
     const chart = document.createElement("span");
@@ -644,16 +676,40 @@ function renderAum() {
   const difference = latest.crore - previous.crore;
   const change = difference / previous.crore;
   id("aum-previous-date").textContent = dateLabel(previous.asOf);
-  id("aum-previous").textContent = `${croresFormat.format(previous.crore)} cr`;
+  id("aum-previous").textContent = `${rupees.format(previous.crore)} cr`;
   id("aum-previous-source").href = previous.sourceUrl;
   id("aum-latest-date").textContent = dateLabel(latest.asOf);
-  id("aum-latest").textContent = `${croresFormat.format(latest.crore)} cr`;
+  id("aum-latest").textContent = `${rupees.format(latest.crore)} cr`;
   id("aum-latest-source").href = latest.sourceUrl;
   id("aum-change").textContent = `${currencyChange.format(difference).replace("-", "−")} cr · ${signedLabel(change)}`;
   id("aum-change").className = direction(change);
 }
 
 function drawReplay() {
+  if (manualPrices) return;
+  const session = replaySession();
+  const picker = id("chart-series");
+  if (chartData !== data) {
+    const selection = picker.value;
+    const navOption = document.createElement("option");
+    navOption.value = "nav";
+    navOption.textContent = "Estimated NAV";
+    const options = [navOption];
+    session[0]?.contributions.forEach((position, index) => {
+      if (position.price == null) return;
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = position.name;
+      options.push(option);
+    });
+    picker.replaceChildren(...options);
+    picker.value = options.some((option) => option.value === selection) ? selection : "nav";
+    chartData = data;
+  }
+  const isNav = picker.value === "nav";
+  const values = session.map((snapshot) => isNav ? snapshot.estimate : snapshot.contributions[Number(picker.value)].price);
+  const current = replayFrame >= 0 ? values[replayFrame] : null;
+  id("chart-price").textContent = current == null ? "" : isNav ? money(current) : rupees.format(current);
   const canvas = id("replay-plot");
   const context = canvas.getContext?.("2d");
   if (!context || !canvas.clientWidth || !canvas.clientHeight) return;
@@ -663,21 +719,32 @@ function drawReplay() {
   canvas.width = width * scale;
   canvas.height = height * scale;
   context.scale(scale, scale);
-  const left = 41;
-  const right = width - 12;
   const top = 12;
   const bottom = height - 24;
-  const x = (index) => left + (right - left) * index / (replayTicks.length - 1);
-  const y = (move) => top + (bottom - top) * (0.13 - move) / 0.68;
   const palette = globalThis.getComputedStyle(canvas);
   const color = (name) => palette.getPropertyValue(name).trim();
 
-  context.strokeStyle = color("--chart-grid");
   context.fillStyle = color("--muted");
   context.font = "11px system-ui";
+  if (!values.length || values[0] == null) {
+    context.fillText("Replay prices unavailable", 9, 22);
+    return;
+  }
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const padding = Math.max((high - low) * 0.16, 0.02);
+  const floor = low - padding;
+  const ceiling = high + padding;
+  const levels = [ceiling, (ceiling + floor) / 2, floor];
+  const left = 17 + Math.max(...levels.map((level) => context.measureText(rupees.format(level)).width));
+  const right = width - 12;
+  const x = (index) => left + (right - left) * index / (values.length - 1);
+  const y = (value) => top + (bottom - top) * (ceiling - value) / (ceiling - floor);
+
+  context.strokeStyle = color("--chart-grid");
   context.setLineDash([4, 4]);
-  for (const level of [0, -0.2, -0.4]) {
-    context.fillText(`${level.toFixed(1).replace("-", "−")}%`, 5, y(level) + 4);
+  for (const level of levels) {
+    context.fillText(rupees.format(level), 7, y(level) + 4);
     context.beginPath();
     context.moveTo(left, y(level));
     context.lineTo(right, y(level));
@@ -687,14 +754,14 @@ function drawReplay() {
   context.lineWidth = 2;
   context.strokeStyle = color("--chart-line");
   context.beginPath();
-  replayTicks.forEach(({ move }, index) => {
-    if (index === 0) context.moveTo(x(index), y(move));
-    else context.lineTo(x(index), y(move));
+  values.forEach((value, index) => {
+    if (index === 0) context.moveTo(x(index), y(value));
+    else context.lineTo(x(index), y(value));
   });
   context.stroke();
-  if (replayFrame >= 0) {
+  if (current != null) {
     const cursorX = x(replayFrame);
-    const cursorY = y(replayTicks[replayFrame].move);
+    const cursorY = y(current);
     context.strokeStyle = color("--accent");
     context.lineWidth = 1;
     context.beginPath();
@@ -707,14 +774,20 @@ function drawReplay() {
     context.fill();
   }
   context.fillStyle = color("--muted");
-  context.fillText("09:15", left, height - 6);
+  context.fillText(replayTicks[0].time, left, height - 6);
+  if (right - left > 165) {
+    const middle = Math.floor(values.length / 2);
+    context.textAlign = "center";
+    context.fillText(replayTicks[middle].time, x(middle), height - 6);
+  }
   context.textAlign = "right";
-  context.fillText("15:30 IST", right, height - 6);
+  context.fillText(`${replayTicks.at(-1).time} IST`, right, height - 6);
 }
 
 function renderReplayControls() {
   const playing = replayTimer !== undefined;
   id("play-replay").textContent = playing ? "Pause replay" : "Play replay";
+  id("step-replay").textContent = replayFrame < 0 ? "Go to 09:15" : "Next 5 min";
   id("step-replay").disabled = replayFrame >= replayTicks.length - 1;
   id("replay-time").textContent = manualPrices ? "Imported snapshot" : replayFrame < 0 ? "Manual scenario" : `${replayTicks[replayFrame].time} IST · Simulated`;
   drawReplay();
@@ -742,10 +815,14 @@ function renderCalculation() {
 
 function render() {
   if (!data) return;
-  const move = Number(id("shock").value);
-  const positions = holdings();
-  const market = manualPrices ?? createDemoSnapshot({ holdings: positions, baseDate: data.nav.date, movePct: move / 100, time: replayTicks[replayFrame]?.time });
-  model = data.portfolio.asOf > data.nav.date ? null : estimateNav({ nav: data.nav, holdings: positions, market });
+  const tick = replayTicks[replayFrame];
+  const move = tick?.move ?? Number(id("shock").value);
+  model = null;
+  if (data.portfolio.asOf <= data.nav.date) {
+    if (manualPrices) model = estimateNav({ nav: data.nav, holdings: holdings(), market: manualPrices });
+    else if (tick) model = replaySession()[replayFrame];
+    else model = simulate(holdings(), { move });
+  }
   id("fund-mark").textContent = data.fund.house;
   id("fund-code").textContent = data.fund.code;
   id("fund-name").textContent = data.fund.name;
@@ -778,7 +855,7 @@ function render() {
   });
   if (model) renderHoldings();
   else {
-    id("holding-rows").innerHTML = '<tr><td colspan="4">The holdings date is later than the available NAV date.</td></tr>';
+    id("holding-rows").innerHTML = '<tr><td colspan="5">The holdings date is later than the available NAV date.</td></tr>';
     id("show-holdings").hidden = true;
   }
 }
@@ -811,7 +888,7 @@ async function refreshSources(force = false) {
   } catch (error) {
     if (sourceRefresh !== controller) return;
     id("source-status").textContent = `${error.message} ${data ? "Showing the previous results." : "Try refreshing sources."}`;
-    if (!data) id("holding-rows").innerHTML = '<tr><td colspan="4">Source data unavailable.</td></tr>';
+    if (!data) id("holding-rows").innerHTML = '<tr><td colspan="5">Source data unavailable.</td></tr>';
   } finally {
     if (sourceRefresh === controller) {
       sourceRefresh = undefined;
@@ -847,6 +924,7 @@ id("play-replay").addEventListener("click", () => {
 });
 id("step-replay").addEventListener("click", () => { pauseReplay(); setReplayFrame(Math.min(replayFrame + 1, replayTicks.length - 1)); });
 id("reset-replay").addEventListener("click", () => { pauseReplay(); setReplayFrame(0); });
+id("chart-series").addEventListener("change", drawReplay);
 globalThis.addEventListener?.("resize", drawReplay);
 id("holdings-sort").addEventListener("change", renderHoldings);
 id("show-holdings").addEventListener("click", () => { expanded = !expanded; renderHoldings(); });
@@ -891,6 +969,7 @@ id("import-form").addEventListener("submit", async (event) => {
 
 async function loadFund() {
   pauseReplay();
+  id("chart-series").value = "nav";
   const fund = id("fund-select").value;
   const currentLoad = ++loadNumber;
   sourceRefresh?.abort();
