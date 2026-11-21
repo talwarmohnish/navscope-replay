@@ -250,10 +250,10 @@ dialog .import-error { color:var(--loss); }
         <div id="scenario-controls">
           <div class="replay-chart" id="replay-chart" aria-hidden="true"><canvas id="replay-plot"></canvas></div>
           <div class="replay-buttons"><button type="button" class="button button-primary" id="play-replay">Play replay</button><button type="button" class="button button-plain" id="step-replay">Next tick</button><button type="button" class="text-action" id="reset-replay">Reset</button></div>
-          <div class="scenario-input"><label for="shock">Simulated move</label><output id="shock-value" for="shock">−1.50%</output></div>
-          <input id="shock" type="range" min="-5" max="5" step="0.05" value="-1.5">
+          <div class="scenario-input"><label for="shock">Simulated move</label><output id="shock-value" for="shock">−0.10%</output></div>
+          <input id="shock" type="range" min="-5" max="5" step="0.05" value="-0.1">
           <div class="range-labels" aria-hidden="true"><span>−5%</span><span>0%</span><span>+5%</span></div>
-          <div class="presets" aria-label="Scenario presets"><button type="button" data-move="-1.5" aria-pressed="true">Down</button><button type="button" data-move="0" aria-pressed="false">Flat</button><button type="button" data-move="1.5" aria-pressed="false">Up</button></div>
+          <div class="presets" aria-label="Scenario presets"><button type="button" data-move="-0.5" aria-pressed="false">Down</button><button type="button" data-move="0" aria-pressed="false">Flat</button><button type="button" data-move="0.5" aria-pressed="false">Up</button></div>
         </div>
         <div class="manual-meta" id="manual-meta" hidden><span>Quotes as of</span><strong id="manual-time">—</strong><button class="text-action" type="button" id="back-to-demo">Switch to simulation</button></div>
         <div class="scenario-footer"><button type="button" id="open-import" class="text-action"><span aria-hidden="true">↑</span> Import price CSV</button></div>
@@ -539,11 +539,11 @@ const csvHeader = "isin,symbol,price,previous_close,base_date,as_of";
 const offlineSnapshot = document.getElementById("offline-data");
 const offlineData = offlineSnapshot ? JSON.parse(offlineSnapshot.textContent) : null;
 const replayTicks = [
-  { time: "09:15", move: -0.25 }, { time: "10:00", move: 0.20 },
-  { time: "10:45", move: -0.35 }, { time: "11:30", move: -0.65 },
-  { time: "12:15", move: -0.40 }, { time: "13:00", move: -1.15 },
-  { time: "13:45", move: -1.75 }, { time: "14:30", move: -1.30 },
-  { time: "15:00", move: -1.50 }, { time: "15:30", move: -0.95 },
+  { time: "09:15", move: -0.05 }, { time: "10:00", move: 0.05 },
+  { time: "10:45", move: -0.05 }, { time: "11:30", move: -0.15 },
+  { time: "12:15", move: -0.10 }, { time: "13:00", move: -0.25 },
+  { time: "13:45", move: -0.40 }, { time: "14:30", move: -0.35 },
+  { time: "15:00", move: -0.45 }, { time: "15:30", move: -0.30 },
 ];
 
 let data;
@@ -663,18 +663,21 @@ function drawReplay() {
   canvas.width = width * scale;
   canvas.height = height * scale;
   context.scale(scale, scale);
-  const left = 12;
+  const left = 41;
   const right = width - 12;
   const top = 12;
   const bottom = height - 24;
   const x = (index) => left + (right - left) * index / (replayTicks.length - 1);
-  const y = (move) => top + (bottom - top) * (0.4 - move) / 2.5;
+  const y = (move) => top + (bottom - top) * (0.13 - move) / 0.68;
   const palette = globalThis.getComputedStyle(canvas);
   const color = (name) => palette.getPropertyValue(name).trim();
 
   context.strokeStyle = color("--chart-grid");
+  context.fillStyle = color("--muted");
+  context.font = "11px system-ui";
   context.setLineDash([4, 4]);
-  for (const level of [0, -1, -2]) {
+  for (const level of [0, -0.2, -0.4]) {
+    context.fillText(`${level.toFixed(1).replace("-", "−")}%`, 5, y(level) + 4);
     context.beginPath();
     context.moveTo(left, y(level));
     context.lineTo(right, y(level));
@@ -704,7 +707,6 @@ function drawReplay() {
     context.fill();
   }
   context.fillStyle = color("--muted");
-  context.font = "11px system-ui";
   context.fillText("09:15", left, height - 6);
   context.textAlign = "right";
   context.fillText("15:30 IST", right, height - 6);
